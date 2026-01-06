@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Student Record App</string>
+    <string name="add_student">Add Student</string>
+    <string name="add_course">Add Course</string>
+    <string name="view_students">View Students</string>
+    <string name="view_courses">View Courses</string>
+    <string name="mark_attendance">Mark Attendance</string>
+    <string name="sync_data">Sync Data</string>
+    <string name="sync_success">Cloud sync completed</string>
+    <string name="sync_failed">Could not sync right now. Please try again.</string>
+</resources>
