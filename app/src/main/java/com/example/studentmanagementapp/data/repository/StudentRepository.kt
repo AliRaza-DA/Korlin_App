@@ -9,6 +9,7 @@ import com.example.studentmanagementapp.data.entity.Attendance
 import com.example.studentmanagementapp.data.entity.Course
 import com.example.studentmanagementapp.data.entity.Enrollment
 import com.example.studentmanagementapp.data.entity.Student
+import java.util.Calendar
 import java.util.Date
 
 class StudentRepository(
@@ -18,6 +19,16 @@ class StudentRepository(
     private val attendanceDao: AttendanceDao,
     private val firestoreRepository: FirestoreRepository = FirestoreRepository()
 ) {
+    data class AttendanceMarkPayload(
+        val studentId: Long,
+        val isPresent: Boolean
+    )
+
+    data class AttendanceBatchResult(
+        val successCount: Int,
+        val failures: List<String>
+    )
+
     suspend fun addStudent(student: Student): Long {
         val id = studentDao.insert(student)
         val savedStudent = student.copy(studentId = id)
@@ -94,10 +105,13 @@ class StudentRepository(
             // Step 2: Delete related enrollments
             enrollmentDao.deleteEnrollmentsByCourseId(it.courseId)
 
-            // Step 3: Delete the course
+            // Step 3: Delete attendance tied to the course
+            attendanceDao.deleteAttendanceByCourse(it.courseId)
+
+            // Step 4: Delete the course
             courseDao.delete(it)
 
-            // Step 4: Delete from Firestore
+            // Step 5: Delete from Firestore
             firestoreRepository.deleteCourse(it.courseId)
         }
     }
@@ -144,16 +158,75 @@ class StudentRepository(
     fun getEnrollmentsForCourse(courseId: Long) = enrollmentDao.getEnrollmentsByCourse(courseId)
     suspend fun getEnrollmentsSnapshot(courseId: Long) = enrollmentDao.getEnrollmentsListByCourse(courseId)
 
-    suspend fun markAttendance(studentId: Long, courseId: Long, isPresent: Boolean) {
-        val attendance = Attendance(
-            studentOwnerId = studentId,
-            courseOwnerId = courseId,
-            date = Date(),
-            isPresent = isPresent
-        )
-        val id = attendanceDao.insert(attendance)
-        // Keep Firestore in sync with the local attendance record.
-        firestoreRepository.saveAttendance(attendance.copy(attendanceId = id))
+    suspend fun saveAttendance(
+        studentId: Long,
+        courseId: Long,
+        isPresent: Boolean,
+        timestamp: Date
+    ): Result<Attendance> {
+        return runCatching {
+            val dayStart = startOfDay(timestamp).time
+            val dayEnd = endOfDay(timestamp).time
+
+            // Avoid duplicate rows for the same student/date by checking the day boundaries.
+            val existing = attendanceDao.getAttendanceForStudentOnDate(
+                studentId = studentId,
+                courseId = courseId,
+                startOfDay = dayStart,
+                endOfDay = dayEnd
+            )
+
+            val attendance = if (existing != null) {
+                existing.copy(isPresent = isPresent, date = timestamp)
+            } else {
+                Attendance(
+                    studentOwnerId = studentId,
+                    courseOwnerId = courseId,
+                    date = timestamp,
+                    isPresent = isPresent
+                )
+            }
+
+            val id = if (existing != null) {
+                attendanceDao.update(attendance)
+                existing.attendanceId
+            } else {
+                attendanceDao.insert(attendance)
+            }
+
+            val saved = attendance.copy(attendanceId = id)
+            firestoreRepository.saveAttendance(saved)
+            saved
+        }
+    }
+
+    suspend fun saveAttendanceBatch(
+        courseId: Long,
+        payloads: List<AttendanceMarkPayload>,
+        timestamp: Date
+    ): AttendanceBatchResult {
+        var successCount = 0
+        val failures = mutableListOf<String>()
+
+        payloads.forEach { payload ->
+            val result = saveAttendance(
+                studentId = payload.studentId,
+                courseId = courseId,
+                isPresent = payload.isPresent,
+                timestamp = timestamp
+            )
+            result.onSuccess { successCount++ }
+                .onFailure {
+                    Log.e(
+                        "AttendanceSave",
+                        "Failed to save attendance for ${payload.studentId} in course $courseId",
+                        it
+                    )
+                    failures.add(payload.studentId.toString())
+                }
+        }
+
+        return AttendanceBatchResult(successCount, failures)
     }
 
     fun getAttendanceByCourse(courseId: Long) = attendanceDao.getAttendanceForCourse(courseId)
@@ -179,6 +252,26 @@ class StudentRepository(
             Log.e("SyncError", "Sync failed", ex)
             false
         }
+    }
+
+    private fun startOfDay(date: Date): Date {
+        val calendar = Calendar.getInstance()
+        calendar.time = date
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        return calendar.time
+    }
+
+    private fun endOfDay(date: Date): Date {
+        val calendar = Calendar.getInstance()
+        calendar.time = date
+        calendar.set(Calendar.HOUR_OF_DAY, 23)
+        calendar.set(Calendar.MINUTE, 59)
+        calendar.set(Calendar.SECOND, 59)
+        calendar.set(Calendar.MILLISECOND, 999)
+        return calendar.time
     }
 
     private fun FirestoreStudent.toEntity(): Student? {

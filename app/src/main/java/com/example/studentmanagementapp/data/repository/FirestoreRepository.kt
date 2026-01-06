@@ -75,9 +75,12 @@ class FirestoreRepository(
             isRepeater = student.isRepeater,
             createdAt = student.createdAt
         )
-        studentsCollection.document(payload.studentId)
-            .set(payload, SetOptions.merge())
-            .await()
+        runCatching {
+            studentsCollection.document(payload.studentId)
+                .set(payload, SetOptions.merge())
+                .await()
+        }.onFailure { Log.e("FirestoreSave", "Failed to save student ${payload.studentId}", it) }
+            .getOrThrow()
     }
 
     suspend fun deleteStudent(studentId: Long) {
@@ -110,9 +113,12 @@ class FirestoreRepository(
             instructorName = course.instructorName,
             semesterNumber = course.semesterNumber
         )
-        coursesCollection.document(payload.courseId)
-            .set(payload, SetOptions.merge())
-            .await()
+        runCatching {
+            coursesCollection.document(payload.courseId)
+                .set(payload, SetOptions.merge())
+                .await()
+        }.onFailure { Log.e("FirestoreSave", "Failed to save course ${payload.courseId}", it) }
+            .getOrThrow()
     }
 
     // NEW: Delete course by ID
@@ -142,9 +148,12 @@ class FirestoreRepository(
             instructorName = course.instructorName,
             semesterNumber = course.semesterNumber
         )
-        coursesCollection.document(payload.courseId)
-            .set(payload, SetOptions.merge())
-            .await()
+        runCatching {
+            coursesCollection.document(payload.courseId)
+                .set(payload, SetOptions.merge())
+                .await()
+        }.onFailure { Log.e("FirestoreSave", "Failed to update course ${payload.courseId}", it) }
+            .getOrThrow()
     }
 
     suspend fun saveEnrollment(enrollment: Enrollment) {
@@ -153,9 +162,12 @@ class FirestoreRepository(
             studentId = enrollment.studentOwnerId.toString(),
             courseId = enrollment.courseOwnerId.toString()
         )
-        enrollmentsCollection.document(payload.enrollmentId)
-            .set(payload, SetOptions.merge())
-            .await()
+        runCatching {
+            enrollmentsCollection.document(payload.enrollmentId)
+                .set(payload, SetOptions.merge())
+                .await()
+        }.onFailure { Log.e("FirestoreSave", "Failed to save enrollment ${payload.enrollmentId}", it) }
+            .getOrThrow()
     }
 
     suspend fun saveAttendance(attendance: Attendance) {
@@ -166,26 +178,26 @@ class FirestoreRepository(
             date = attendance.date,
             isPresent = attendance.isPresent
         )
-        attendanceCollection.document(payload.attendanceId)
-            .set(payload, SetOptions.merge())
-            .await()
+        runCatching {
+            attendanceCollection.document(payload.attendanceId)
+                .set(payload, SetOptions.merge())
+                .await()
+        }.onFailure { Log.e("FirestoreSave", "Failed to save attendance ${payload.attendanceId}", it) }
+            .getOrThrow()
     }
 
     suspend fun fetchAllData(): FirestoreDataBundle {
-        return try {
+        return runCatching {
             val students = studentsCollection.get().await().toObjects(FirestoreStudent::class.java)
             val courses = coursesCollection.get().await().toObjects(FirestoreCourse::class.java)
             val enrollments = enrollmentsCollection.get().await().toObjects(FirestoreEnrollment::class.java)
             val attendance = attendanceCollection.get().await().toObjects(FirestoreAttendance::class.java)
             FirestoreDataBundle(students, courses, enrollments, attendance)
-        } catch (e: Exception) {
-            Log.e("FirestoreFetch", "Failed to fetch data", e)
-            FirestoreDataBundle(emptyList(), emptyList(), emptyList(), emptyList())
-        }
+        }.onFailure { Log.e("FirestoreFetch", "Failed to fetch data", it) }
+            .getOrThrow()
     }
 
     suspend fun waitForPendingWrites() {
         firestore.waitForPendingWrites().await()
     }
 }
-

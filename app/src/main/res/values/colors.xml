@@ -21,4 +21,7 @@
     <!-- Network Chip -->
     <color name="red_400">#F44336</color>           <!-- Offline -->
     <color name="green_400">#4CAF50</color>         <!-- Online -->
+
+    <!-- Typography helpers -->
+    <color name="dark_gray">#555555</color>
 </resources>
