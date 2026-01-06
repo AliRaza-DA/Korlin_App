@@ -10,6 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.studentmanagementapp.databinding.ActivityMainBinding
 import com.example.studentmanagementapp.ui.attendance.MarkAttendanceActivity
+import com.example.studentmanagementapp.ui.attendance.ViewAttendanceActivity
 import com.example.studentmanagementapp.ui.course.AddCourseActivity
 import com.example.studentmanagementapp.ui.course.ViewCoursesActivity
 import com.example.studentmanagementapp.ui.student.AddStudentActivity
@@ -60,6 +61,10 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnMarkAttendance.setOnClickListener {
             startActivity(Intent(this, MarkAttendanceActivity::class.java))
+        }
+
+        binding.btnViewAttendance.setOnClickListener {
+            startActivity(Intent(this, ViewAttendanceActivity::class.java))
         }
 
         binding.btnSyncData.setOnClickListener {

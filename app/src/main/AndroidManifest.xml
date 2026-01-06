@@ -17,6 +17,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.StudentManagementApp">
 
+        <activity android:name=".ui.attendance.ViewAttendanceActivity" />
         <activity android:name=".ui.attendance.MarkAttendanceActivity" />
         <activity android:name=".ui.course.CourseDetailActivity" />
         <activity android:name=".ui.course.AddCourseActivity" />
