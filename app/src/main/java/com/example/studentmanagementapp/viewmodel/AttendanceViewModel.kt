@@ -8,7 +8,12 @@ import com.example.studentmanagementapp.data.entity.Attendance
 import com.example.studentmanagementapp.data.entity.Enrollment
 import com.example.studentmanagementapp.data.entity.Student
 import com.example.studentmanagementapp.data.repository.StudentRepository
+import com.example.studentmanagementapp.data.repository.StudentRepository.AttendanceBatchResult
+import com.example.studentmanagementapp.data.repository.StudentRepository.AttendanceMarkPayload
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Date
 
 class AttendanceViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: StudentRepository
@@ -21,9 +26,13 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
 
     fun getAttendanceByCourse(courseId: Long) = repository.getAttendanceByCourse(courseId)
 
-    fun markAttendance(studentId: Long, courseId: Long, isPresent: Boolean) {
-        viewModelScope.launch {
-            repository.markAttendance(studentId, courseId, isPresent)
+    suspend fun saveAttendance(
+        courseId: Long,
+        payloads: List<AttendanceMarkPayload>,
+        timestamp: Long
+    ): AttendanceBatchResult {
+        return withContext(Dispatchers.IO) {
+            repository.saveAttendanceBatch(courseId, payloads, Date(timestamp))
         }
     }
 
@@ -45,4 +54,13 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     fun getEnrollments(courseId: Long) = repository.getEnrollmentsForCourse(courseId)
     suspend fun getAttendanceSnapshot(courseId: Long): List<Attendance> =
         repository.getAttendanceListForCourse(courseId)
+
+    suspend fun getStudentsByIds(ids: List<Long>): List<Student> = withContext(Dispatchers.IO) {
+        repository.getStudentsByIds(ids)
+    }
+
+    suspend fun getAttendanceForDate(courseId: Long, sessionDate: Long): List<Attendance> =
+        withContext(Dispatchers.IO) {
+            repository.getAttendanceForCourseOnDate(courseId, sessionDate)
+        }
 }
