@@ -24,6 +24,20 @@ import com.example.studentmanagementapp.viewmodel.CourseViewModel
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.studentmanagementapp.R
+import com.example.studentmanagementapp.adapter.AttendanceDisplayItem
+import com.example.studentmanagementapp.adapter.AttendanceRecordAdapter
+import com.example.studentmanagementapp.adapter.CourseSelectAdapter
+import com.example.studentmanagementapp.data.entity.Course
+import com.example.studentmanagementapp.databinding.ActivityViewAttendanceBinding
+import com.example.studentmanagementapp.viewmodel.AttendanceViewModel
+import com.example.studentmanagementapp.viewmodel.CourseViewModel
+import com.example.studentmanagementapp.viewmodel.StudentViewModel
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
 import java.util.Locale
 
 class ViewAttendanceActivity : AppCompatActivity() {
@@ -31,9 +45,10 @@ class ViewAttendanceActivity : AppCompatActivity() {
     private lateinit var binding: ActivityViewAttendanceBinding
     private val attendanceViewModel: AttendanceViewModel by viewModels()
     private val courseViewModel: CourseViewModel by viewModels()
+    private val studentViewModel: StudentViewModel by viewModels()
     private var selectedCourse: Course? = null
     private var attendanceLiveData: LiveData<List<com.example.studentmanagementapp.data.entity.Attendance>>? = null
-    private lateinit var adapter: AttendanceSessionAdapter
+    private lateinit var adapter: AttendanceRecordAdapter
     private lateinit var toolbar: Toolbar
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,18 +61,7 @@ class ViewAttendanceActivity : AppCompatActivity() {
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.title = getString(R.string.view_attendance)
 
-        adapter = AttendanceSessionAdapter(emptyList()) { item ->
-            val course = selectedCourse ?: return@AttendanceSessionAdapter
-            startActivity(
-                android.content.Intent(this, AttendanceRecordActivity::class.java).apply {
-                    putExtra(EXTRA_COURSE_ID, course.courseId)
-                    putExtra(EXTRA_SESSION_DATE, item.sessionDateMs)
-                    putExtra(EXTRA_COURSE_NAME, course.courseName)
-                    putExtra(EXTRA_COURSE_CODE, course.courseCode)
-                    putExtra(EXTRA_INSTRUCTOR, course.instructorName)
-                }
-            )
-        }
+        adapter = AttendanceRecordAdapter(emptyList())
         binding.rvAttendance.layoutManager = LinearLayoutManager(this)
         binding.rvAttendance.adapter = adapter
 
@@ -65,6 +69,10 @@ class ViewAttendanceActivity : AppCompatActivity() {
             if (courses.isNotEmpty() && selectedCourse == null) {
                 showCourseSelectorBottomSheet(courses)
             }
+        }
+
+        studentViewModel.students.observe(this) {
+            if (selectedCourse != null) observeAttendance()
         }
 
         binding.btnSelectCourse.setOnClickListener {
@@ -105,33 +113,29 @@ class ViewAttendanceActivity : AppCompatActivity() {
             }
 
             binding.tvEmptyState.visibility = View.GONE
-            val formatter = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-            val sessions = records.groupBy { normalizeToDay(it.date.time) }
-                .entries
-                .sortedByDescending { it.key }
-                .map { entry ->
-                    AttendanceSessionItem(
-                        sessionDateMs = entry.key,
-                        title = getString(R.string.attendance_session_title),
-                        subtitle = formatter.format(entry.key)
+            lifecycleScope.launch {
+                // Resolve student info for the attendance records so UI stays readable.
+                val students = attendanceViewModel.getStudentsByIds(records.map { it.studentOwnerId }.distinct())
+                val studentMap = students.associateBy { it.studentId }
+                val formatter = SimpleDateFormat("MMM dd, yyyy h:mma", Locale.getDefault())
+                val items = records.map { attendance ->
+                    val student = studentMap[attendance.studentOwnerId]
+                    AttendanceDisplayItem(
+                        id = attendance.attendanceId,
+                        studentName = student?.name ?: getString(R.string.unknown_student),
+                        registration = student?.registrationNumber ?: getString(R.string.not_available),
+                        statusLabel = if (attendance.isPresent) getString(R.string.present) else getString(R.string.absent),
+                        dateLabel = formatter.format(attendance.date),
+                        isPresent = attendance.isPresent
                     )
                 }
-            adapter.submitList(sessions)
+                adapter.submitList(items)
+            }
         }
     }
 
     override fun onSupportNavigateUp(): Boolean {
         finish()
         return true
-    }
-
-    private fun normalizeToDay(timestamp: Long): Long {
-        val calendar = Calendar.getInstance()
-        calendar.timeInMillis = timestamp
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        return calendar.timeInMillis
     }
 }

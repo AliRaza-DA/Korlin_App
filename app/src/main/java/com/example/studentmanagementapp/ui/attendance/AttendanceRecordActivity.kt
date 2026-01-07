@@ -78,54 +78,50 @@ class AttendanceRecordActivity : AppCompatActivity() {
     private fun loadCourseAndAttendance() {
         lifecycleScope.launch {
             course = attendanceViewModel.getCourse(courseId) ?: fallbackCourse
-            attendanceViewModel.loadAttendanceForDate(courseId, sessionDate) { records ->
-                if (records.isEmpty()) {
-                    binding.tvEmptyState.visibility = android.view.View.VISIBLE
-                    adapter.submitList(emptyList())
-                    return@loadAttendanceForDate
-                }
-
-                attendanceViewModel.loadStudentsByIds(records.map { it.studentOwnerId }.distinct()) { students ->
-                    val studentMap = students.associateBy { it.studentId }
-                    val formatter = SimpleDateFormat("MMM dd, yyyy h:mma", Locale.getDefault())
-                    val items = records.map { attendance ->
-                        val student = studentMap[attendance.studentOwnerId]
-                        AttendanceDisplayItem(
-                            id = attendance.attendanceId,
-                            studentName = student?.name ?: getString(R.string.unknown_student),
-                            registration = student?.registrationNumber ?: getString(R.string.not_available),
-                            statusLabel = if (attendance.isPresent) getString(R.string.present) else getString(R.string.absent),
-                            dateLabel = formatter.format(attendance.date),
-                            isPresent = attendance.isPresent
-                        )
-                    }
-                    binding.tvEmptyState.visibility = android.view.View.GONE
-                    adapter.submitList(items)
-                }
+            val records = attendanceViewModel.getAttendanceForDate(courseId, sessionDate)
+            if (records.isEmpty()) {
+                binding.tvEmptyState.visibility = android.view.View.VISIBLE
+                adapter.submitList(emptyList())
+                return@launch
             }
+
+            val students = attendanceViewModel.getStudentsByIds(records.map { it.studentOwnerId }.distinct())
+            val studentMap = students.associateBy { it.studentId }
+            val formatter = SimpleDateFormat("MMM dd, yyyy h:mma", Locale.getDefault())
+            val items = records.map { attendance ->
+                val student = studentMap[attendance.studentOwnerId]
+                AttendanceDisplayItem(
+                    id = attendance.attendanceId,
+                    studentName = student?.name ?: getString(R.string.unknown_student),
+                    registration = student?.registrationNumber ?: getString(R.string.not_available),
+                    statusLabel = if (attendance.isPresent) getString(R.string.present) else getString(R.string.absent),
+                    dateLabel = formatter.format(attendance.date),
+                    isPresent = attendance.isPresent
+                )
+            }
+            binding.tvEmptyState.visibility = android.view.View.GONE
+            adapter.submitList(items)
         }
     }
 
     private fun exportPdf() {
         val localCourse = course ?: fallbackCourse ?: return
         lifecycleScope.launch {
-            attendanceViewModel.loadAttendanceForDate(courseId, sessionDate) { attendanceRecords ->
-                attendanceViewModel.loadStudentsByIds(attendanceRecords.map { it.studentOwnerId }.distinct()) { students ->
-                    val file = PdfUtils.generateAttendanceSessionPdf(
-                        this@AttendanceRecordActivity,
-                        localCourse,
-                        sessionDate,
-                        students,
-                        attendanceRecords
-                    )
-                    if (file != null) {
-                        Toast.makeText(
-                            this@AttendanceRecordActivity,
-                            getString(R.string.pdf_saved_at, file.absolutePath),
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
+            val attendanceRecords = attendanceViewModel.getAttendanceForDate(courseId, sessionDate)
+            val students = attendanceViewModel.getStudentsByIds(attendanceRecords.map { it.studentOwnerId }.distinct())
+            val file = PdfUtils.generateAttendanceSessionPdf(
+                this@AttendanceRecordActivity,
+                localCourse,
+                sessionDate,
+                students,
+                attendanceRecords
+            )
+            if (file != null) {
+                Toast.makeText(
+                    this@AttendanceRecordActivity,
+                    getString(R.string.pdf_saved_at, file.absolutePath),
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }
