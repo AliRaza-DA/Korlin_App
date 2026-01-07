@@ -157,6 +157,7 @@ class MarkAttendanceActivity : AppCompatActivity() {
                     Toast.LENGTH_SHORT
                 ).show()
                 resetSelections()
+                finish()
             } else {
                 if (result.successCount > 0) {
                     updateToolbarSubtitle(attendanceTimestamp)

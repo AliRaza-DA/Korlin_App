@@ -58,9 +58,4 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     suspend fun getStudentsByIds(ids: List<Long>): List<Student> = withContext(Dispatchers.IO) {
         repository.getStudentsByIds(ids)
     }
-
-    suspend fun getAttendanceForDate(courseId: Long, sessionDate: Long): List<Attendance> =
-        withContext(Dispatchers.IO) {
-            repository.getAttendanceForCourseOnDate(courseId, sessionDate)
-        }
 }
