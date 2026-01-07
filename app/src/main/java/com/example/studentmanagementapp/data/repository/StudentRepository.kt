@@ -231,6 +231,11 @@ class StudentRepository(
 
     fun getAttendanceByCourse(courseId: Long) = attendanceDao.getAttendanceForCourse(courseId)
     suspend fun getAttendanceListForCourse(courseId: Long) = attendanceDao.getAttendanceListForCourse(courseId)
+    suspend fun getAttendanceForCourseOnDate(courseId: Long, sessionDate: Long): List<Attendance> {
+        val start = startOfDay(Date(sessionDate)).time
+        val end = endOfDay(Date(sessionDate)).time
+        return attendanceDao.getAttendanceForCourseOnDate(courseId, start, end)
+    }
 
     suspend fun syncWithFirestore(): Boolean {
         return try {

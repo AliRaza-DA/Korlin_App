@@ -41,4 +41,14 @@ interface AttendanceDao {
 
     @Query("DELETE FROM attendance WHERE courseOwnerId = :courseId")
     suspend fun deleteAttendanceByCourse(courseId: Long)
+
+    @Query(
+        "SELECT * FROM attendance WHERE courseOwnerId = :courseId " +
+            "AND date BETWEEN :startOfDay AND :endOfDay ORDER BY date DESC"
+    )
+    suspend fun getAttendanceForCourseOnDate(
+        courseId: Long,
+        startOfDay: Long,
+        endOfDay: Long
+    ): List<Attendance>
 }
